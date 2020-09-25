@@ -7,6 +7,6 @@ realtime.py is a program which do the real time shape detection regcognized diff
 <br />
 screenshot of the result of angle.py is angleresult.png<br />
 <br />
-screenshot of the result of realtime detection is realtime1.png, realtime2.png ,realtime3.png<br />
+screenshot of the result of realtime detection is realtimeResult1.png, realtimeResult2.png ,realtimeResult3.png<br />
 <br />
 
