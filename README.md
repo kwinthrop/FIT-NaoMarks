@@ -5,8 +5,8 @@ angle.py is a porgram describe three points combine two lines dynamically and ca
 <br />
 realtime.py is a program which do the real time shape detection regcognized different shapes in different colors<br />
 <br />
-screenshot of the result of angle.py is angleresult.png
+screenshot of the result of angle.py is angleresult.png<br />
 <br />
-screenshot of the result of realtime detection is realtime1.png, realtime2.png , realtime3.png
+screenshot of the result of realtime detection is realtime1.png, realtime2.png , realtime3.png<br />
 <br />
 
