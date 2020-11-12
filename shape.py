@@ -1,73 +1,91 @@
-import cv2
+#!/usr/bin/python
+import math
 import numpy as np
+import cv2
 
-
-
-def nothing(x):
-    # any operation
-    pass
-
+#dictionary of all contours
+contours = {}
+#array of edges of polygon
+approx = []
+#scale of the text
+scale = 2
+#camera
 cap = cv2.VideoCapture(0)
+print("press q to exit")
 
-cv2.namedWindow("Trackbars")
-cv2.createTrackbar("L-H", "Trackbars", 0, 180, nothing)
-cv2.createTrackbar("L-S", "Trackbars", 66, 255, nothing)
-cv2.createTrackbar("L-V", "Trackbars", 134, 255, nothing)
-cv2.createTrackbar("U-H", "Trackbars", 180, 180, nothing)
-cv2.createTrackbar("U-S", "Trackbars", 255, 255, nothing)
-cv2.createTrackbar("U-V", "Trackbars", 243, 255, nothing)
+# Define the codec and create VideoWriter object
+fourcc = cv2.VideoWriter_fourcc(*'XVID')
+out = cv2.VideoWriter('output.avi',fourcc, 20.0, (640,480))
 
-font = cv2.FONT_HERSHEY_COMPLEX
+#calculate angle
+def angle(pt1,pt2,pt0):
+    dx1 = pt1[0][0] - pt0[0][0]
+    dy1 = pt1[0][1] - pt0[0][1]
+    dx2 = pt2[0][0] - pt0[0][0]
+    dy2 = pt2[0][1] - pt0[0][1]
+    return float((dx1*dx2 + dy1*dy2))/math.sqrt(float((dx1*dx1 + dy1*dy1))*(dx2*dx2 + dy2*dy2) + 1e-10)
 
-while True:
-    _, frame = cap.read()
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+while(cap.isOpened()):
+    #Capture frame-by-frame
+    ret, frame = cap.read()
+    if ret==True:
+        #grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #Canny
+        canny = cv2.Canny(frame,80,240,3)
 
-    l_h = cv2.getTrackbarPos("L-H", "Trackbars")
-    l_s = cv2.getTrackbarPos("L-S", "Trackbars")
-    l_v = cv2.getTrackbarPos("L-V", "Trackbars")
-    u_h = cv2.getTrackbarPos("U-H", "Trackbars")
-    u_s = cv2.getTrackbarPos("U-S", "Trackbars")
-    u_v = cv2.getTrackbarPos("U-V", "Trackbars")
+        #contours
+        contours, hierarchy = cv2.findContours(canny,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+        for i in range(0,len(contours)):
+            #approximate the contour with accuracy proportional to
+            #the contour perimeter
+            approx = cv2.approxPolyDP(contours[i],cv2.arcLength(contours[i],True)*0.02,True)
 
-    lower_red = np.array([l_h, l_s, l_v])
-    upper_red = np.array([u_h, u_s, u_v])
+            #Skip small or non-convex objects
+            if(abs(cv2.contourArea(contours[i]))<100 or not(cv2.isContourConvex(approx))):
+                continue
 
-    mask = cv2.inRange(hsv, lower_red, upper_red)
-    kernel = np.ones((5, 5), np.uint8)
-    mask = cv2.erode(mask, kernel)
+            #triangle
+            if(len(approx) == 3):
+                x,y,w,h = cv2.boundingRect(contours[i])
+                cv2.putText(frame,'TRI',(x,y),cv2.FONT_HERSHEY_SIMPLEX,scale,(255,255,255),2,cv2.LINE_AA)
+            elif(len(approx)>=4 and len(approx)<=6):
+                #nb vertices of a polygonal curve
+                vtc = len(approx)
+                #get cos of all corners
+                cos = []
+                for j in range(2,vtc+1):
+                    cos.append(angle(approx[j%vtc],approx[j-2],approx[j-1]))
+                #sort ascending cos
+                cos.sort()
+                #get lowest and highest
+                mincos = cos[0]
+                maxcos = cos[-1]
 
-    # Contours detection
-    if int(cv2.__version__[0]) > 3:
-        # Opencv 4.x.x
-        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    else:
-        # Opencv 3.x.x
-        _, contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                #Use the degrees obtained above and the number of vertices
+                #to determine the shape of the contour
+                x,y,w,h = cv2.boundingRect(contours[i])
+                if(vtc==4):
+                    cv2.putText(frame,'RECT',(x,y),cv2.FONT_HERSHEY_SIMPLEX,scale,(255,255,255),2,cv2.LINE_AA)
+                elif(vtc==5):
+                    cv2.putText(frame,'PENTA',(x,y),cv2.FONT_HERSHEY_SIMPLEX,scale,(255,255,255),2,cv2.LINE_AA)
+                elif(vtc==6):
+                    cv2.putText(frame,'HEXA',(x,y),cv2.FONT_HERSHEY_SIMPLEX,scale,(255,255,255),2,cv2.LINE_AA)
+            else:
+                #detect and label circle
+                area = cv2.contourArea(contours[i])
+                x,y,w,h = cv2.boundingRect(contours[i])
+                radius = w/2
+                if(abs(1 - (float(w)/h))<=2 and abs(1-(area/(math.pi*radius*radius)))<=0.2):
+                    cv2.putText(frame,'CIRC',(x,y),cv2.FONT_HERSHEY_SIMPLEX,scale,(255,255,255),2,cv2.LINE_AA)
 
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        approx = cv2.approxPolyDP(cnt, 0.02*cv2.arcLength(cnt, True), True)
-        x = approx.ravel()[0]
-        y = approx.ravel()[1]
+        #Display the resulting frame
+        out.write(frame)
+        cv2.imshow('frame',frame)
+        cv2.imshow('canny',canny)
+        if cv2.waitKey(1) == 27: #if q is pressed
+            break
 
-        if area > 400:
-            cv2.drawContours(frame, [approx], 0, (0, 0, 0), 5)
-
-            if len(approx) == 3:
-                cv2.putText(frame, "Triangle", (x, y), font, 1, (0, 0, 0))
-            elif len(approx) == 4:
-                cv2.putText(frame, "Rectangle", (x, y), font, 1, (0, 0, 0))
-            elif 10 < len(approx) < 20:
-                cv2.putText(frame, "Circle", (x, y), font, 1, (0, 0, 0))
-
-
-    cv2.imshow("Frame", frame)
-    cv2.imshow("Mask", mask)
-
-    key = cv2.waitKey(1)
-    if key == 27:
-        break
-
+#When everything done, release the capture
 cap.release()
 cv2.destroyAllWindows()
